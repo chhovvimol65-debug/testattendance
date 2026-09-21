@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Scan វត្តមាន</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+Khmer:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --text:#e2e8f0; --muted:#94a3b8; --brand:#6366f1; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:'Inter','Noto Sans Khmer',system-ui,sans-serif; }
+  .app { max-width:560px; margin:0 auto; padding:calc(env(safe-area-inset-top,0px) + 12px) 14px calc(env(safe-area-inset-bottom,0px) + 16px); }
+  header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .title { font-weight:700; font-size:1.05rem; }
+  .sub { font-size:.78rem; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--muted); margin-right:6px; }
+  .dot.on { background:var(--ok); } .dot.off { background:var(--err); }
+  button, .btn { font:inherit; border:0; border-radius:12px; padding:.7rem 1rem; color:#fff; background:var(--brand);
+    font-weight:600; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:.4rem; }
+  button.secondary, .btn.secondary { background:#334155; }
+  button.danger { background:var(--err); } button.green, .btn.green { background:var(--ok); }
+  button:disabled { opacity:.5; }
+  .icon-btn { padding:.55rem .75rem; background:#334155; }
+  #reader { width:100%; min-height:280px; background:#000; border-radius:16px; overflow:hidden; position:relative; }
+  #reader video { border-radius:16px; }
+  .placeholder { color:var(--muted); text-align:center; padding:6rem 1rem; font-size:.95rem; }
+  .row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:120px; }
+  .result { margin-top:12px; background:var(--card); border-radius:16px; padding:1rem; text-align:center; border-left:8px solid var(--muted); }
+  .result.ok { border-color:var(--ok); } .result.warn { border-color:var(--warn); } .result.err { border-color:var(--err); }
+  .result .big { font-size:1.5rem; font-weight:700; margin:.2rem 0; }
+  .result .kind { font-size:1.05rem; font-weight:600; }
+  .result .meta { color:var(--muted); font-size:.9rem; }
+  .badge { display:inline-block; padding:.15rem .6rem; border-radius:999px; font-size:.78rem; font-weight:700; margin-top:.3rem; }
+  .badge.ok { background:#064e3b; color:#6ee7b7; } .badge.warn { background:#78350f; color:#fcd34d; }
+  .manual { display:flex; gap:8px; margin-top:12px; }
+  .manual input { flex:1; padding:.7rem .8rem; border-radius:12px; border:1px solid #334155; background:#0b1220; color:var(--text); font:inherit; min-width:0; }
+  .history { margin:12px 0 0; padding:0; list-style:none; font-size:.85rem; }
+  .history li { display:flex; justify-content:space-between; gap:8px; padding:.45rem .2rem; border-bottom:1px solid #1e293b; color:var(--muted); }
+  .history li b { color:var(--text); font-weight:600; }
+  /* settings overlay */
+  #overlay { position:fixed; inset:0; background:rgba(2,6,23,.85); display:none; align-items:center; justify-content:center; padding:16px; z-index:10; }
+  #overlay.show { display:flex; }
+  .panel { background:var(--card); border-radius:18px; padding:1.2rem; width:100%; max-width:460px; }
+  .panel h2 { margin:0 0 .8rem; font-size:1.1rem; }
+  .panel label { display:block; font-size:.82rem; color:var(--muted); margin:.7rem 0 .25rem; }
+  .panel input { width:100%; padding:.7rem .8rem; border-radius:10px; border:1px solid #475569; background:#0b1220; color:var(--text); font:inherit; }
+  .panel .msg { font-size:.85rem; margin-top:.6rem; min-height:1.2em; }
+  .hint { font-size:.75rem; color:var(--muted); margin-top:14px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <div class="title" id="company">Scan វត្តមាន</div>
+      <div class="sub"><span class="dot" id="dot"></span><span id="status">Not connected</span></div>
+    </div>
+    <button class="icon-btn" id="btnSettings" aria-label="Settings">⚙ Settings</button>
+  </header>
+
+  <div id="reader"><div class="placeholder">📷<br>ចុច «បើកកាមេរ៉ា» ដើម្បីចាប់ផ្តើម<br><small>Tap “Start camera” to begin</small></div></div>
+
+  <div class="row">
+    <button id="btnStart">📷 បើកកាមេរ៉ា / Start</button>
+    <button id="btnStop" class="danger" style="display:none">⏹ បិទ / Stop</button>
+    <button id="btnFlip" class="secondary">🔄 ប្តូរកាមេរ៉ា / Flip</button>
+  </div>
+
+  <div class="result" id="result">
+    <div class="meta">កំពុងរង់ចាំការ Scan… · Waiting for a scan…</div>
+  </div>
+
+  <div class="manual">
+    <input id="manual" placeholder="វាយលេខកូដ / type code, then Enter" autocomplete="off">
+    <button id="btnManual" class="green">OK</button>
+  </div>
+
+  <div class="row">
+    <label class="btn secondary" style="margin:0">📸 ថតរូប QR / Photo
+      <input type="file" id="photo" accept="image/*" capture="environment" hidden>
+    </label>
+  </div>
+
+  <ul class="history" id="history"></ul>
+  <div class="hint">If the live camera does not start: allow camera access for this site in your browser settings and make sure the page address starts with <b>https://</b>. Facebook / Telegram / Messenger in-app browsers often block the camera — open the link in Chrome or Safari.</div>
+</div>
+
+<div id="overlay">
+  <div class="panel">
+    <h2>Connection settings</h2>
+    <label for="cfgUrl">Apps Script Web App URL (ends with /exec)</label>
+    <input id="cfgUrl" placeholder="https://script.google.com/macros/s/.../exec" autocapitalize="off" autocorrect="off">
+    <label for="cfgKey">Scanner key</label>
+    <input id="cfgKey" type="password" placeholder="Scanner key from setupSecurity()" autocapitalize="off" autocorrect="off">
+    <div class="msg" id="cfgMsg"></div>
+    <div class="row">
+      <button id="cfgOpen" class="secondary">Open URL</button>
+      <button id="cfgTest" class="secondary">Test</button>
+      <button id="cfgSave">Save</button>
+      <button id="cfgClose" class="secondary">Close</button>
+    </div>
+    <div class="hint"><b>Check the URL:</b> tap “Open URL” in a <b>private/incognito tab</b>. You should see a page saying “Access denied”. If you see a Google sign-in page, the Web App access is not “Anyone”. If you see “Script function not found”, deploy a New version.</div>
+    <div class="hint">Saved only on this device. Tip: you can also configure a device with a link ending in <code>#u=&lt;encoded /exec URL&gt;&amp;k=&lt;scanner key&gt;</code>.</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"
+        onerror="var s=document.createElement('script');s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';document.head.appendChild(s);"></script>
+<script>
+(function () {
+  'use strict';
+
+  var CFG_KEY = 'qr_scanner_cfg_v1';
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { cfg: null, scanner: null, running: false, facing: 'environment', busy: false, last: { t: '', ts: 0 }, history: [], wake: null };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  /* ---------- config ---------- */
+  function loadCfg() {
+    try {
+      var h = new URLSearchParams(location.hash.replace(/^#/, ''));
+      if (h.get('u') && h.get('k')) {
+        var c = { url: h.get('u'), key: h.get('k') };
+        localStorage.setItem(CFG_KEY, JSON.stringify(c));
+        history.replaceState(null, '', location.pathname + location.search); // remove the key from the address bar
+        return c;
+      }
+      return JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
+    } catch (e) { return null; }
+  }
+
+  /** Cleans a copied Apps Script URL: removes /u/1/ or /a/domain/ account segments that force a Google login. */
+  function normUrl(u) {
+    u = String(u || '').trim().split('?')[0].split('#')[0];
+    u = u.replace(/\/macros\/u\/\d+\//, '/macros/').replace(/\/macros\/a\/[^/]+\//, '/macros/');
+    return u;
+  }
+
+  function setStatus(text, on) {
+    $('status').textContent = text;
+    $('dot').className = 'dot ' + (on === true ? 'on' : on === false ? 'off' : '');
+  }
+
+  /* ---------- API ---------- */
+  function callApi(action, extra, cfg) {
+    cfg = cfg || state.cfg;
+    if (cfg && cfg.url) cfg = { url: normUrl(cfg.url), key: cfg.key };
+    if (!cfg || !cfg.url || !cfg.key) return Promise.reject(new Error('Not configured. Open Settings and enter the URL and scanner key.'));
+    var timer;
+    var payload = Object.assign({ action: action, key: cfg.key }, extra || {});
+    var timeout = new Promise(function (_, reject) {
+      timer = setTimeout(function () { var er = new Error('Timed out'); er.name = 'TimeoutError'; reject(er); }, 20000);
+    });
+    // No Content-Type header => "simple" request (text/plain), so no CORS preflight is needed.
+    // (No AbortSignal is passed, so this also works inside sandboxed previews.)
+    var request = fetch(cfg.url, { method: 'POST', body: JSON.stringify(payload), redirect: 'follow' })
+      .then(function (res) { return res.text(); });
+    return Promise.race([request, timeout])
+      .then(function (text) {
+        var data;
+        try { data = JSON.parse(text); } catch (e) {
+          throw new Error('Server did not return JSON. Check the /exec URL and that the Web App access is set to "Anyone".');
+        }
+        if (!data.ok) throw new Error(data.error || 'Request failed');
+        return data;
+      })
+      .catch(function (e) {
+        if (e && e.name === 'TimeoutError') throw new Error('Timed out. Check your internet connection.');
+        if (e instanceof TypeError) throw new Error('Cannot reach the server. Usually the Web App is not deployed as "Anyone" (or the deployment was not updated with a New version), or the URL is not the /exec deployment URL. Settings > "Open URL" to check.');
+        throw e;
+      })
+      .then(function (d) { clearTimeout(timer); return d; }, function (e) { clearTimeout(timer); throw e; });
+  }
+
+  function ping() {
+    setStatus('Connecting…');
+    return callApi('ping').then(function (d) {
+      $('company').textContent = d.company || 'Scan វត្តមាន';
+      setStatus('Connected', true);
+    }).catch(function (e) { setStatus(e.message, false); });
+  }
+
+  /* ---------- feedback ---------- */
+  function beep(ok) {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+      var ctx = new Ctx(), o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = ok ? 880 : 220; g.gain.value = 0.1; o.connect(g); g.connect(ctx.destination); o.start();
+      setTimeout(function () { o.stop(); ctx.close(); }, ok ? 160 : 380);
+    } catch (e) { /* ignore */ }
+    try { if (navigator.vibrate) navigator.vibrate(ok ? 80 : [120, 60, 120]); } catch (e) { /* ignore */ }
+  }
+
+  function showResult(r, kind) {
+    var box = $('result');
+    box.className = 'result ' + kind;
+    if (kind === 'err') {
+      box.innerHTML = '<div style="font-size:2.4rem">❌</div><div class="kind">មិនជោគជ័យ · Failed</div><div class="meta">' + esc(r.message) + '</div>';
+      return;
+    }
+    var isIn = r.type === 'CHECK_IN';
+    var late = isIn && r.status === 'Late';
+    box.innerHTML =
+      '<div style="font-size:2.4rem">' + (late ? '⚠️' : '✅') + '</div>' +
+      '<div class="big">' + esc(r.name) + '</div>' +
+      '<div class="meta">' + esc(r.empId) + (r.position ? ' · ' + esc(r.position) : '') + '</div>' +
+      '<div class="kind" style="margin-top:.4rem">' + (isIn ? 'ចូលធ្វើការ · Check-in' : 'ចេញពីធ្វើការ · Check-out') + ' — ' + esc(r.time) + '</div>' +
+      (isIn ? '<span class="badge ' + (late ? 'warn' : 'ok') + '">' + (late ? 'យឺត · Late' : 'ទាន់ម៉ោង · On time') + '</span>'
+            : '<div class="meta">ម៉ោងធ្វើការ · Worked ' + esc(r.hours) + ' h</div>');
+  }
+
+  function pushHistory(name, action, time, ok) {
+    state.history.unshift({ name: name, action: action, time: time, ok: ok });
+    state.history = state.history.slice(0, 6);
+    $('history').innerHTML = state.history.map(function (h) {
+      return '<li><span>' + (h.ok ? '✅' : '❌') + ' <b>' + esc(h.name) + '</b> — ' + esc(h.action) + '</span><span>' + esc(h.time) + '</span></li>';
+    }).join('');
+  }
+
+  /* ---------- scan flow ---------- */
+  function processScan(code) {
+    state.busy = true;
+    return callApi('scan', { code: code }).then(function (d) {
+      var r = d.result;
+      showResult(r, r.type === 'CHECK_IN' && r.status === 'Late' ? 'warn' : 'ok');
+      beep(true);
+      pushHistory(r.name, r.type === 'CHECK_IN' ? 'Check-in' : 'Check-out', r.time, true);
+      setStatus('Connected', true);
+    }).catch(function (e) {
+      showResult({ message: e.message }, 'err');
+      beep(false);
+      pushHistory(code, e.message, new Date().toLocaleTimeString(), false);
+    }).then(function () { setTimeout(function () { state.busy = false; }, 1500); });
+  }
+
+  function onDecode(text) {
+    var now = Date.now();
+    if (state.busy) return;
+    if (text === state.last.t && now - state.last.ts < 4000) return;
+    state.last = { t: text, ts: now };
+    processScan(text);
+  }
+
+  function getScanner() { if (!state.scanner) state.scanner = new Html5Qrcode('reader'); return state.scanner; }
+
+  function setRunning(on) {
+    state.running = on;
+    $('btnStart').style.display = on ? 'none' : '';
+    $('btnStop').style.display = on ? '' : 'none';
+  }
+
+  function requestWake() {
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { state.wake = l; }).catch(function () {}); } catch (e) { /* ignore */ }
+  }
+
+  function startCam() {
+    if (state.running) return Promise.resolve();
+    if (typeof Html5Qrcode === 'undefined') {
+      // the fallback CDN may still be loading: wait up to 4 s
+      return new Promise(function (res) {
+        var tries = 0, t = setInterval(function () {
+          tries++;
+          if (typeof Html5Qrcode !== 'undefined') { clearInterval(t); res(startCam()); }
+          else if (tries > 20) {
+            clearInterval(t);
+            showResult({ message: 'QR library failed to load. Check your internet connection (or open this page from its real https:// address, not an editor preview).' }, 'err');
+            res();
+          }
+        }, 200);
+      });
+    }
+    $('reader').innerHTML = '';
+    return getScanner().start(
+      { facingMode: state.facing },
+      { fps: 10, qrbox: function (w, h) { var s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } },
+      onDecode, function () {}
+    ).then(function () { setRunning(true); requestWake(); })
+     .catch(function (err) {
+       var m = String((err && err.message) || err);
+       var hint = /NotAllowed|Permission/i.test(m)
+         ? 'Camera blocked. Allow camera for this site, use https://, and avoid in-app browsers (Facebook/Telegram) — open in Chrome/Safari.'
+         : 'Cannot start camera: ' + m;
+       showResult({ message: hint }, 'err');
+     });
+  }
+
+  function stopCam() {
+    if (!state.scanner || !state.running) return Promise.resolve();
+    return state.scanner.stop().then(function () { setRunning(false); }).catch(function () { setRunning(false); });
+  }
+
+  function flipCam() {
+    state.facing = state.facing === 'environment' ? 'user' : 'environment';
+    return stopCam().then(startCam);
+  }
+
+  function scanPhoto(file) {
+    if (!file) return;
+    stopCam().then(function () { return getScanner().scanFile(file, false); })
+      .then(processScan)
+      .catch(function () { showResult({ message: 'No QR code found in that photo. Try again, filling the frame with the QR.' }, 'err'); });
+  }
+
+  function manual() {
+    var v = $('manual').value.trim();
+    if (!v) return;
+    $('manual').value = '';
+    processScan(v);
+  }
+
+  /* ---------- settings UI ---------- */
+  function openSettings() {
+    $('cfgUrl').value = (state.cfg && state.cfg.url) || '';
+    $('cfgKey').value = (state.cfg && state.cfg.key) || '';
+    $('cfgMsg').textContent = '';
+    $('overlay').classList.add('show');
+  }
+  function readForm() { return { url: $('cfgUrl').value.trim(), key: $('cfgKey').value.trim() }; }
+
+  $('btnSettings').addEventListener('click', openSettings);
+  $('cfgClose').addEventListener('click', function () { $('overlay').classList.remove('show'); });
+  $('cfgOpen').addEventListener('click', function () {
+    var u = normUrl($('cfgUrl').value);
+    if (u) window.open(u, '_blank', 'noopener');
+  });
+  $('cfgTest').addEventListener('click', function () {
+    var c = readForm(); var m = $('cfgMsg'); m.style.color = '#94a3b8'; m.textContent = 'Testing…';
+    callApi('ping', {}, c).then(function (d) { m.style.color = '#6ee7b7'; m.textContent = 'Connected: ' + (d.company || 'OK'); })
+      .catch(function (e) { m.style.color = '#fca5a5'; m.textContent = e.message; });
+  });
+  $('cfgSave').addEventListener('click', function () {
+    var c = readForm();
+    c.url = normUrl(c.url);
+    $('cfgUrl').value = c.url;
+    if (/\/dev$/.test(c.url)) {
+      $('cfgMsg').style.color = '#fca5a5'; $('cfgMsg').textContent = 'That is the /dev test URL. Use the deployment URL ending in /exec.'; return;
+    }
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(c.url)) {
+      $('cfgMsg').style.color = '#fca5a5'; $('cfgMsg').textContent = 'URL must look like https://script.google.com/macros/s/.../exec'; return;
+    }
+    if (!c.key) { $('cfgMsg').style.color = '#fca5a5'; $('cfgMsg').textContent = 'Scanner key is required.'; return; }
+    state.cfg = c;
+    try { localStorage.setItem(CFG_KEY, JSON.stringify(c)); } catch (e) { /* ignore */ }
+    $('overlay').classList.remove('show');
+    ping();
+  });
+
+  $('btnStart').addEventListener('click', startCam);
+  $('btnStop').addEventListener('click', stopCam);
+  $('btnFlip').addEventListener('click', flipCam);
+  $('btnManual').addEventListener('click', manual);
+  $('manual').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); manual(); } });
+  $('photo').addEventListener('change', function (e) { scanPhoto(e.target.files[0]); e.target.value = ''; });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && state.running) requestWake(); });
+
+  /* ---------- init ---------- */
+  state.cfg = loadCfg();
+  if (state.cfg) { ping().then(startCam); } else { setStatus('Not configured', false); openSettings(); }
+})();
+</script>
+</body>
+</html>
